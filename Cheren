@@ -1,12 +1,149 @@
+import requests
+import json
+from pydantic import BaseModel
+from typing import Union
 
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мой сайт</title>
-</head>
-<body>
-    <h1>Добро пожаловать!</h1>
-    <p>Это мой первый HTML файл.</p>
-</body>
-</html>
+class Item(BaseModel): 
+    name: str
+    description: Union[str, None] = "Описание товара"
+    price: float
+    id: Union[int, None] = -1
+    
+    def __str__(self):
+        return f"Товар: {self.name}, стоимость: {self.price} рублей"
+    
+    
+class User(BaseModel):
+    login:str
+    email: str
+    password: str
+
+
+class AuthUser(BaseModel):
+    login: str
+    password: str   
+
+
+def send_get(url):
+    headers = {'Authorization': 'xxx'}
+    response = requests.get(url, headers = headers)
+    return response.text, response.status_code
+
+
+def all_items():
+    result, code = send_get("http://localhost:8000/items/print")
+    match code:
+        case 200:
+            json_items = json.loads(result)
+            for json_item in json_items:
+                item = Item(**json_item)
+                print(item)
+                
+        case 401:
+            print("Неверные авторизацинные данные")
+
+        case 403:
+            print("Доступ ограничен")
+        
+        case _:
+            print("Неизвестная ошибка")
+
+
+def create_item():
+    print("\nДОБАВЛЕНИЕ ТОВАРА")
+    name = input("Название товара: ")
+    price = float(input("Цена товара: "))
+    
+    item_data = Item(name=name, price=price)
+    
+    response = requests.post("http://localhost:8000/items/create", json=item_data.model_dump())
+    
+    if response.status_code == 200:
+        created_item = Item(**response.json())
+        print(created_item)
+    else:
+        print("Ошибка добавления товара")
+
+
+def reg():
+    print("\nРЕГИСТРАЦИЯ")
+    login = input("Логин: ")
+    email = input("Email: ")
+    password = input("Пароль: ")
+    
+    user_data = User(login=login, email=email, password=password)
+    
+    response = requests.post("http://localhost:8000/users/reg", json=user_data.model_dump())
+    
+    if response.status_code == 200:
+        user = response.json()
+        print(f"\nПользователь {user['login']} успешно зарегестрирован")
+        return True
+    else:
+        error = response.json().get('detail', 'Ошибка')
+        print(f"Произошла ошибка: {error}")
+        return False
+
+
+def auth():
+    print("\nАВТОРИЗАЦИЯ")
+    login = input("Логин: ")
+    password = input("Пароль: ")
+    
+    user_data = AuthUser(login=login, password=password)
+    
+    response = requests.post("http://localhost:8000/users/auth", json=user_data.model_dump())
+    
+    if response.status_code == 200:
+        user = response.json()
+        print(f"\nАвторизация прошла успешно")
+        print(f"Логин: {user['login']}")
+        print(f"Токен: {user['token']}")
+        return True
+    else:
+        error = response.json().get('detail', 'Ошибка')
+        print(f"Произошла ошибка: {error}")
+        return False
+        
+               
+def main_menu():
+    
+    while True:
+        try:
+            print("\nВведите команду:")
+            command = int(input("1 - Список товаров\n2 - Добавить товар\n3 - Выйти из профиля\n"))
+            
+            match command:
+                case 1:
+                    all_items()
+                case 2:
+                    create_item()
+                case 3:
+                    break
+                case _:
+                    print("Нет такого выбора")
+                    
+        except ValueError:
+            print("Некорректный ввод!")
+            
+            
+while True:
+    try:
+        print("\nВведите команду:")
+        command = int(input("1 - Регистрация\n2 - Авторизация\n3 - Выйти из программы\n"))
+        
+        match command:
+            case 1:
+                if reg():
+                    main_menu()
+            case 2:
+                if auth():
+                    main_menu()
+            case 3:
+                print("Конец")
+                break
+            case _:
+                print("Нет такого выбора")
+                
+    except ValueError:
+        print("Некорректный ввод!")
