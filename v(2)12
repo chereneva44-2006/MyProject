@@ -1,0 +1,29 @@
+def check_signature(request: Request, call_next):
+    if request.url.path in ["/users/reg", "/users/auth"]:
+        return call_next(request)
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    client_signature = request.headers.get("Authorization")
+    client_time = request.headers.get("Time")
+    
+    if not client_signature or not client_time:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+
+    # ПРОВЕРКА варианта1
+    # ПРОВЕРКА варианта2 
+    user_files = [f for f in os.listdir("users") if f.endswith('.json')]
+    signature_valid = False
+
+    for user_file in user_files:
+        with open(f"users/{user_file}", 'r') as f:
+            user_data = json.load(f)
+            if user_data.get('session_token') == auth_header:
+                session_token = user_data.get('session_token')
+                signature = hashlib.sha256(f"{session_token}{client_time}".encode()).hexdigest()
+                
+                if client_signature == signature:
+                    signature_valid = True
+                    break
