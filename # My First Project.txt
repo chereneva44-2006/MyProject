@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой первый сайт</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8ff;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Добро пожаловать на мой сайт! 🚀</h1>
+        <p>Это мой первый проект с использованием Git и GitHub.</p>
+        <p>Сегодня я учусь:</p>
+        <ul>
+            <li>Работать с Git</li>
+            <li>Использовать VS Code</li>
+            <li>Публиковать код на GitHub</li>
+        </ul>
+    </div>
+</body>
+</html>
