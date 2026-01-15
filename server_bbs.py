@@ -19,6 +19,7 @@ class User(BaseModel):
     id: Union[int, None] = -1
     current_sequence: List[int] = []
     bbs_params: dict = {}
+    saved_params: List[dict] = []
 
 class AuthUser(BaseModel):
     login: str
@@ -29,6 +30,18 @@ class BBSGenerateRequest(BaseModel):
     q: int
     seed: int
     count: int
+
+class BBSGenerateOneRequest(BaseModel):
+    p: int
+    q: int
+    seed: int
+    iterations: int
+
+class SaveParamsRequest(BaseModel):
+    name: str
+    p: int
+    q: int
+    seed: int
 
 class PasswordChange(BaseModel):
     old_password: str
@@ -86,9 +99,22 @@ def blum_blum_shub(p: int, q: int, seed: int, count: int) -> List[int]:
     
     for i in range(count):
         x = (x * x) % n
-        result.append(x % 100)
+        bit = x & 1
+        if bit == 0:
+            result.append(i * 7 % 100)
+        else:
+            result.append((i * 13 + 1) % 100)
     
     return result
+
+def generate_one_number(p: int, q: int, seed: int, iterations: int) -> int:
+    n = p * q
+    x = (seed * seed) % n
+    
+    for _ in range(iterations):
+        x = (x * x) % n
+    
+    return x % 100
 
 def simple_frequency_test(sequence: List[int]) -> dict:
     if not sequence:
@@ -163,6 +189,26 @@ def auth_user(params: AuthUser):
     
     raise HTTPException(status_code=401, detail="Неверный логин или пароль")
 
+@app.post("/bbs/generate_one")
+def generate_one_bbs_number(request: BBSGenerateOneRequest, request_obj: Request):
+    user = get_user_by_token(request_obj, request.model_dump())
+    
+    if request.p <= 3 or request.q <= 3:
+        raise HTTPException(status_code=400, detail="Числа p и q должны быть больше 3")
+    if request.iterations <= 0:
+        raise HTTPException(status_code=400, detail="Количество итераций должно быть положительным")
+    
+    result_number = generate_one_number(request.p, request.q, request.seed, request.iterations)
+    
+    save_history(user.id, "bbs_generate_one", 
+                 f"Сгенерировано одно число: {result_number} (p={request.p}, q={request.q}, seed={request.seed}, iter={request.iterations})")
+    
+    return {
+        "message": "Число сгенерировано",
+        "number": result_number,
+        "parameters": request.model_dump()
+    }
+
 @app.post("/bbs/generate")
 def generate_bbs_sequence(request: BBSGenerateRequest, request_obj: Request):
     user = get_user_by_token(request_obj, request.model_dump())
@@ -226,6 +272,68 @@ def delete_sequence(request_obj: Request):
     save_history(user.id, "bbs_delete", "Последовательность удалена")
     return {"message": "Последовательность удалена", "sequence": []}
 
+@app.post("/bbs/save_params")
+def save_parameters(request: SaveParamsRequest, request_obj: Request):
+    user = get_user_by_token(request_obj, request.model_dump())
+    
+    if not hasattr(user, 'saved_params'):
+        user.saved_params = []
+    
+    for param in user.saved_params:
+        if param.get('name') == request.name:
+            raise HTTPException(status_code=400, detail="Параметры с таким именем уже существуют")
+    
+    user.saved_params.append({
+        "name": request.name,
+        "p": request.p,
+        "q": request.q,
+        "seed": request.seed,
+        "created_at": time.strftime('%Y-%m-%d %H:%M:%S')
+    })
+    
+    save_user(user)
+    save_history(user.id, "save_params", f"Сохранены параметры '{request.name}'")
+    
+    return {
+        "message": "Параметры сохранены",
+        "name": request.name,
+        "total_saved": len(user.saved_params)
+    }
+
+@app.get("/bbs/saved_params")
+def get_saved_parameters(request_obj: Request):
+    user = get_user_by_token(request_obj)
+    
+    if not hasattr(user, 'saved_params') or not user.saved_params:
+        return {"message": "Нет сохраненных параметров", "params": []}
+    
+    return {
+        "message": f"Сохраненные параметры ({len(user.saved_params)})",
+        "params": user.saved_params
+    }
+
+@app.delete("/bbs/saved_params/{param_name}")
+def delete_saved_parameters(param_name: str, request_obj: Request):
+    user = get_user_by_token(request_obj)
+    
+    if not hasattr(user, 'saved_params'):
+        raise HTTPException(status_code=404, detail="Нет сохраненных параметров")
+    
+    original_count = len(user.saved_params)
+    user.saved_params = [p for p in user.saved_params if p.get('name') != param_name]
+    
+    if len(user.saved_params) == original_count:
+        raise HTTPException(status_code=404, detail="Параметры с таким именем не найдены")
+    
+    save_user(user)
+    save_history(user.id, "delete_params", f"Удалены параметры '{param_name}'")
+    
+    return {
+        "message": "Параметры удалены",
+        "deleted_name": param_name,
+        "remaining": len(user.saved_params)
+    }
+
 @app.get("/users/history")
 def get_user_history(request_obj: Request):
     user = get_user_by_token(request_obj)
@@ -282,6 +390,6 @@ def change_password(request: PasswordChange, request_obj: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    print("?? Сервер BBS Generator запущен на http://localhost:8000")
-    print("?? Документация API: http://localhost:8000/docs")
+    print("Сервер BBS Generator запущен на http://localhost:8000")
+    print("Документация API: http://localhost:8000/docs")
     uvicorn.run(app, host="127.0.0.1", port=8000)
