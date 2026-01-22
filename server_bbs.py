@@ -94,50 +94,39 @@ def save_history(user_id: int, operation_type: str, details: str):
 
 def blum_blum_shub(p: int, q: int, seed: int, count: int) -> List[int]:
     n = p * q
-    x = (seed * seed) % n
+    x = seed % n
     result = []
     
-    for i in range(count):
-        x = (x * x) % n
-        bit = x & 1
-        if bit == 0:
-            result.append(i * 7 % 100)
-        else:
-            result.append((i * 13 + 1) % 100)
+    for _ in range(count):
+        byte_value = 0
+        
+        for _ in range(8):
+            x = (x * x) % n
+            bit = x & 1
+            byte_value = (byte_value << 1) | bit
+        
+        result.append(byte_value % 100)
     
     return result
 
 def generate_one_number(p: int, q: int, seed: int, iterations: int) -> int:
     n = p * q
-    x = (seed * seed) % n
+    x = seed % n
     
     for _ in range(iterations):
         x = (x * x) % n
     
-    return x % 100
-
-def simple_frequency_test(sequence: List[int]) -> dict:
-    if not sequence:
-        return {"error": "Последовательность пуста"}
+    byte_value = 0
+    for _ in range(8):
+        x = (x * x) % n
+        bit = x & 1
+        byte_value = (byte_value << 1) | bit
     
-    even_count = sum(1 for num in sequence if num % 2 == 0)
-    odd_count = len(sequence) - even_count
-    
-    expected_ratio = 0.5
-    actual_ratio = even_count / len(sequence) if len(sequence) > 0 else 0
-    
-    return {
-        "total_numbers": len(sequence),
-        "even_count": even_count,
-        "odd_count": odd_count,
-        "even_percentage": round(actual_ratio * 100, 2),
-        "odd_percentage": round((1 - actual_ratio) * 100, 2),
-        "is_balanced": abs(actual_ratio - expected_ratio) < 0.2
-    }
+    return byte_value % 100  
 
 # === ЭНДПОИНТЫ API ===
 
-@app.post("/users/reg")
+@app.post("/users/register")
 def create_user(user: User):
     if not os.path.exists("users"):
         os.makedirs("users")
@@ -169,7 +158,7 @@ def create_user(user: User):
         "session_token": user.session_token
     }
 
-@app.post("/users/auth")
+@app.post("/users/authenticate")
 def auth_user(params: AuthUser):
     json_files_names = [file for file in os.listdir('users/') if file.endswith('.json')]
     for json_file_name in json_files_names:
@@ -223,7 +212,7 @@ def generate_bbs_sequence(request: BBSGenerateRequest, request_obj: Request):
     user.current_sequence = sequence
     user.bbs_params = request.model_dump()
     save_user(user)
-    
+
     save_history(user.id, "bbs_generate", f"Сгенерировано {request.count} чисел BBS")
     return {
         "message": "Последовательность сгенерирована",
@@ -243,22 +232,6 @@ def get_current_sequence(request_obj: Request):
         "message": "Текущая последовательность",
         "sequence": user.current_sequence,
         "params": user.bbs_params
-    }
-
-@app.post("/bbs/test")
-def test_sequence(request_obj: Request):
-    user = get_user_by_token(request_obj)
-    
-    if not user.current_sequence:
-        raise HTTPException(status_code=404, detail="Последовательность не найдена")
-    
-    test_result = simple_frequency_test(user.current_sequence)
-    
-    save_history(user.id, "bbs_test", f"Выполнен частотный тест")
-    return {
-        "message": "Результаты частотного теста",
-        "test_result": test_result,
-        "sequence": user.current_sequence
     }
 
 @app.delete("/bbs/current")
