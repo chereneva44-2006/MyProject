@@ -42,21 +42,6 @@ def print_error(response):
     except:
         print(f"Ошибка: {response}")
 
-def is_prime(n):
-    if n < 2:
-        return False
-    if n == 2:
-        return True
-    if n % 2 == 0:
-        return False
-    for i in range(3, int(n**0.5) + 1, 2):
-        if n % i == 0:
-            return False
-    return True
-
-def is_blum_prime(n):
-    return is_prime(n) and (n % 4 == 3)
-
 class Client:
     def __init__(self):
         self.session_token = None
@@ -81,36 +66,25 @@ class Client:
         
         return response.text, response.status_code
     
-    def print_bbs_info(self):
-        print("\n" + "="*60)
-        print("ИНФОРМАЦИЯ О ПАРАМЕТРАХ BBS:")
-        print("="*60)
-        print("Для корректной работы генератора BBS рекомендуется:")
-        print("- p и q должны быть простыми числами")
-        print("- p и q должны быть сравнимы с 3 по модулю 4 (p % 4 == 3, q % 4 == 3)")
-        print("- p и q не должны быть равны")
-        print("- seed не должно быть кратно p*q")
-        print("\nПримеры подходящих параметров:")
-        print("- p=11, q=19, seed=13")
-        print("- p=23, q=31, seed=17")
-        print("="*60 + "\n")
-    
-    def check_basic_params(self, p, q, seed):
-        errors = []
-        if p <= 3 or q <= 3:
-            errors.append("p и q должны быть больше 3")
-        if p == q:
-            errors.append("p и q не должны быть равны")
-        if seed <= 0:
-            errors.append("seed должно быть положительным числом")
-        
-        if errors:
-            print("\nПредупреждение:")
-            for error in errors:
-                print(f"- {error}")
-            print("Генерация может работать некорректно.")
-            return False
-        return True
+    def print_bbs_requirements(self):
+        print("\n")
+        print("ВАЖНО: Для корректной работы генератора BBS нужны БОЛЬШИЕ ПРОСТЫЕ ЧИСЛА!")
+        print("Требования к параметрам:")
+        print("1. p и q должны быть ПРОСТЫМИ числами")
+        print("2. Оба числа должны давать остаток 3 при делении на 4")
+        print("   (т.е. p % 4 == 3 и q % 4 == 3)")
+        print("3. p и q не должны быть равны")
+        print("4. Начальное значение (seed) должно быть взаимно простым с n = p*q")
+        print("")
+        print("РЕКОМЕНДУЕМЫЕ ПАРАМЕТРЫ:")
+        print("1. p=23, q=31, seed=17,29,37,41,53  (для тестирования)")
+        print("2. p=107, q=127, seed=131,137,149,151  (хороший вариант)")
+        print("")
+        print("ПЛОХИЕ ПРИМЕРЫ (избегайте):")
+        print("- p=7, q=11, seed=5  (слишком маленькие, короткие циклы)")
+        print("- p=13, q=17  (13 % 4 = 1, не подходит)")
+        print("- p=11, q=12  (q не простое)")
+        print("")
     
     def register(self):
         print("\nРЕГИСТРАЦИЯ В СИСТЕМЕ BBS")
@@ -169,7 +143,7 @@ class Client:
     
     def generate_one_number(self):
         print("\nГЕНЕРАЦИЯ ОДНОГО ЧИСЛА BBS")
-        self.print_bbs_info()
+        self.print_bbs_requirements()
         
         try:
             p = int(input("Число p: "))
@@ -177,8 +151,9 @@ class Client:
             seed = int(input("Начальное значение (seed): "))
             iterations = int(input("Количество итераций: "))
             
-            self.check_basic_params(p, q, seed)
-            
+            if p <= 3 or q <= 3:
+                print("Ошибка: числа p и q должны быть больше 3")
+                return
             if iterations <= 0:
                 print("Ошибка: количество итераций должно быть положительным")
                 return
@@ -199,15 +174,13 @@ class Client:
     
     def generate_sequence(self):
         print("\nГЕНЕРАЦИЯ ПОСЛЕДОВАТЕЛЬНОСТИ BBS")
-        self.print_bbs_info()
+        self.print_bbs_requirements()
         
         try:
             p = int(input("Число p: "))
             q = int(input("Число q: "))
             seed = int(input("Начальное значение (seed): "))
             count = int(input("Количество чисел (1-100): "))
-            
-            self.check_basic_params(p, q, seed)
             
             if count < 1 or count > 100:
                 print("Ошибка: количество должно быть от 1 до 100")
@@ -264,7 +237,7 @@ class Client:
     
     def save_parameters(self):
         print("\nСОХРАНЕНИЕ ПАРАМЕТРОВ ГЕНЕРАЦИИ")
-        self.print_bbs_info()
+        self.print_bbs_requirements()
         
         try:
             name = input("Название для сохранения параметров: ")
@@ -276,7 +249,9 @@ class Client:
             q = int(input("Число q: "))
             seed = int(input("Начальное значение (seed): "))
             
-            self.check_basic_params(p, q, seed)
+            if p <= 3 or q <= 3:
+                print("Ошибка: числа p и q должны быть больше 3")
+                return
             
             data = {"name": name, "p": p, "q": q, "seed": seed}
             result, code = self.send_request('POST', "http://localhost:8000/bbs/save_params", data)
